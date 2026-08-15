@@ -1,0 +1,9 @@
+{
+  "name": "test",
+  "input": "tests\\input.md",
+  "chunks": 2,
+  "max_qr_chars": 2000,
+  "compress_level": 9,
+  "ecc": "M",
+  "png_enabled": true
+}

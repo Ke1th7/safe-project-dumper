@@ -343,11 +343,37 @@ def _read_payloads_from_dir(indir: pathlib.Path, doc: str | None) -> List[str]:
     return payloads
 
 
+def _read_payloads_from_file(input_file: pathlib.Path, doc: str | None) -> List[str]:
+    payloads: List[str] = []
+    for line_number, line in enumerate(
+        input_file.read_text(encoding="utf-8-sig").splitlines(), start=1
+    ):
+        payload = line.strip()
+        if not payload:
+            continue
+
+        try:
+            rec = ChunkRecord.from_json(payload)
+        except BundleError as exc:
+            raise BundleError(f"Invalid chunk at line {line_number}: {exc}") from exc
+
+        if doc and rec.doc != doc:
+            continue
+        payloads.append(payload)
+
+    if not payloads:
+        raise BundleError("No valid JSON chunk payloads found in input file")
+
+    return payloads
+
+
 def cmd_unpack(args: argparse.Namespace) -> int:
-    in_dir = pathlib.Path(args.indir)
     out_file = pathlib.Path(args.output)
 
-    payloads = _read_payloads_from_dir(in_dir, args.doc_id)
+    if args.input_file:
+        payloads = _read_payloads_from_file(pathlib.Path(args.input_file), args.doc_id)
+    else:
+        payloads = _read_payloads_from_dir(pathlib.Path(args.indir), args.doc_id)
     raw = unpack_payloads(payloads)
     out_file.parent.mkdir(parents=True, exist_ok=True)
     out_file.write_bytes(raw)
@@ -378,7 +404,12 @@ def build_parser() -> argparse.ArgumentParser:
     p_pack.set_defaults(func=cmd_pack)
 
     p_unpack = sub.add_parser("unpack", help="Rebuild file from chunk payloads")
-    p_unpack.add_argument("--indir", required=True, help="Input chunk directory")
+    input_source = p_unpack.add_mutually_exclusive_group(required=True)
+    input_source.add_argument("--indir", help="Input chunk directory")
+    input_source.add_argument(
+        "--input-file",
+        help="Text file containing one complete JSON chunk per line",
+    )
     p_unpack.add_argument("--output", required=True, help="Output rebuilt file")
     p_unpack.add_argument("--doc-id", help="Optional doc_id filter")
     p_unpack.set_defaults(func=cmd_unpack)

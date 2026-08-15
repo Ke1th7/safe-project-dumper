@@ -1,8 +1,10 @@
+import pathlib
 import random
 import secrets
+import tempfile
 import unittest
 
-from tools.offline_qr_bundle import BundleError, pack_bytes, unpack_payloads
+from tools.offline_qr_bundle import BundleError, main, pack_bytes, unpack_payloads
 
 
 class OfflineQrBundleTests(unittest.TestCase):
@@ -41,6 +43,30 @@ class OfflineQrBundleTests(unittest.TestCase):
 
         with self.assertRaises(BundleError):
             unpack_payloads(tampered)
+
+    def test_unpack_from_combined_text_file(self) -> None:
+        raw = secrets.token_bytes(5000)
+        payloads = pack_bytes(raw, max_qr_chars=380)
+        self.assertGreater(len(payloads), 1)
+
+        with tempfile.TemporaryDirectory() as temp_dir:
+            root = pathlib.Path(temp_dir)
+            input_file = root / "scanned-all.txt"
+            output_file = root / "recovered.bin"
+            input_file.write_text("\n".join(payloads) + "\n", encoding="utf-8")
+
+            exit_code = main(
+                [
+                    "unpack",
+                    "--input-file",
+                    str(input_file),
+                    "--output",
+                    str(output_file),
+                ]
+            )
+
+            self.assertEqual(exit_code, 0)
+            self.assertEqual(output_file.read_bytes(), raw)
 
 
 if __name__ == "__main__":
