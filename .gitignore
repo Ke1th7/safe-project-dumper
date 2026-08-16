@@ -11,3 +11,7 @@ Thumbs.db
 # Temporary
 *.tmp
 *.log
+
+# Output
+output/
+qr-output/
